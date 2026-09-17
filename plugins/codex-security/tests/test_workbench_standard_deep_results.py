@@ -2511,3 +2511,52 @@ def test_budget_exhaustion_rejects_incomplete_standard_result_draft(tmp_path: Pa
     )
 
     assert "incomplete canonical scan draft" in str(rejected["stderr"])
+
+
+def test_merge_saved_results_deduplicates_string_open_questions(tmp_path: Path) -> None:
+    scripts_dir = Path(__file__).resolve().parents[1] / "scripts"
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    import workbench_saved_results
+
+    scan_dir = tmp_path / "scan"
+    scan_dir.mkdir()
+    scan_id = "test-scan-open-questions"
+
+    manifest = {
+        "scan": {
+            "id": scan_id,
+            "target": {"kind": "git_revision", "repository": "test", "revision": "head"},
+            "scope": {"includePaths": ["."], "excludePaths": []},
+            "status": "in_progress",
+        }
+    }
+    (scan_dir / "scan-manifest.json").write_text(json.dumps(manifest))
+    (scan_dir / "findings.json").write_text(json.dumps({"findings": []}))
+    (scan_dir / "coverage.json").write_text(
+        json.dumps(
+            {
+                "completeness": "partial",
+                "openQuestions": ["Q1", "Q2", "Q3"],
+            }
+        )
+    )
+
+    binding = {
+        "status": "in_progress",
+        "allowedTargetKinds": ["git_revision"],
+        "target": {"kind": "git_revision", "repository": "test", "revision": "head"},
+        "scope": {"includePaths": ["."], "excludePaths": []},
+        "coverageMode": "repository",
+    }
+
+    result = workbench_saved_results.merge_saved_results(
+        scan_dir, scan_id, binding, [], [], stopped=False, reason=""
+    )
+    assert result is not None
+    _, _, coverage = result
+    assert coverage.get("openQuestions") == [
+        {"question": "Q1"},
+        {"question": "Q2"},
+        {"question": "Q3"},
+    ]

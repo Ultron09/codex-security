@@ -685,6 +685,11 @@ def merge_saved_results(
             "deferred": [],
         }
     )
+    if isinstance(coverage.get("openQuestions"), list):
+        coverage["openQuestions"] = [
+            {"question": item.strip()} if isinstance(item, str) else item
+            for item in coverage["openQuestions"]
+        ]
     canonical_rows = (
         {
             id(item)
@@ -994,6 +999,24 @@ def merge_saved_results(
                     and (field == "deferred" or item.get("disposition") == "needs_follow_up")
                 ):
                     continue
+                if field == "openQuestions" and isinstance(item, dict):
+                    question_text = item.get("question")
+                    if isinstance(question_text, str):
+                        matched = False
+                        for existing in output:
+                            if (
+                                isinstance(existing, dict)
+                                and existing.get("question") == question_text
+                            ):
+                                if "followUpPrompt" in item and "followUpPrompt" not in existing:
+                                    existing["followUpPrompt"] = item["followUpPrompt"]
+                                matched = True
+                                break
+                            elif isinstance(existing, str) and existing.strip() == question_text:
+                                matched = True
+                                break
+                        if matched:
+                            continue
                 if isinstance(item, dict) and "id" not in item:
                     semantic_item = dict(item)
                     if field == "surfaces":
