@@ -587,6 +587,23 @@ Scans are report-only by default. Set `--fail-on-severity high` to exit with
 `1` if a completed scan finds high or critical issues. Incomplete scans exit
 with `2`, writing available results to stdout and a coverage warning to stderr.
 
+For machine-readable scan output (`--format json` or `--format jsonl`), a scan
+execution failure writes one structured object to stdout:
+
+```json
+{
+  "status": "failed",
+  "code": "SCAN_FAILED",
+  "message": "..."
+}
+```
+
+The command still exits with `2` for runtime, export, invalid-input, or
+incomplete-scan failures, and human-readable diagnostics remain on stderr.
+Use `scan --schema --format json` to discover this failure variant alongside
+the successful scan output. Cancellation and termination retain their `130`
+and `143` exit codes.
+
 ### Import findings as a saved scan
 
 Import an existing findings CSV or JSON file into local scan history and SQLite:
@@ -1690,6 +1707,8 @@ its read-only Codex sandbox.
 to select findings and add patch instructions. Results include a `patches`
 entry per finding with status `verified`, `no_change`, `blocked`, or `failed`.
 Verified and already-fixed findings no longer fail `--fail-on-severity`.
+Patching shows each finding's position, elapsed time, and live Codex activity.
+Progress goes to stderr; completed results stay in the terminal history.
 
 `--create-pr` commits generated patch files and opens a draft GitHub pull request
 with `gh` or a draft GitLab merge request with `glab`. Install and authenticate
@@ -1793,6 +1812,12 @@ cancels, resumes, publishes, edits, or deduplicates anything.
 
 The dashboard opens on Findings, followed by Duplicate groups. Both views
 support search, repository filtering, sorting, pagination, and record details.
+Click any column header to sort all matching records; click it again to reverse
+the order. The arrow marks the active column and direction. Changing the sort
+returns to the first page, and automatic refreshes keep the selected order.
+By default, findings sort by last update descending, then severity descending,
+then ID ascending to break ties. Groups sort by last update descending and ID
+ascending.
 Findings show stored content and links to their duplicate groups. Groups link
 back to their member findings, preserving separate overlapping groups and the
 original finding records.
@@ -1809,7 +1834,10 @@ repository choices, a page of records, and optional selected-record details:
 
 - `view`: `findings` (default) or `groups`.
 - `query`, `repository`: optional search text and exact repository ID.
-- `sort`: `activity` (default; most recently updated first) or `newest`.
+- `sort`: `activity` (default; last update), `newest` (created), `title`,
+  `repository`, `severity` (findings only), or `members` (groups only).
+- `direction`: `asc` or `desc` (default). Text sorts alphabetically without
+  case sensitivity, severity by level, and member counts numerically.
 - `limit`, `offset`: existing pagination conventions, defaulting to 50 and 0.
 - `id`: optional exact record ID to include in `detail`; unknown IDs return
   `detail: null` without hiding the list.
